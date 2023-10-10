@@ -1,0 +1,39 @@
+name: python-fastapi
+services:
+  api:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile
+    command: sh -c "uvicorn main:app --reload --port=8000 --host=0.0.0.0"
+    ports:
+      - 8000:8000
+    env_file:
+      - ../.env.development
+    volumes:
+      - ../:/app
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:alpine
+    restart: always
+    ports:
+      - 6379:6379
+    command: sh -c "redis-server --save 20 1 --loglevel warning --appendonly yes --requirepass $$REDIS_PASSWORD"
+    env_file:
+      - ../.env.development
+    volumes:
+      - cache:/data
+
+  worker:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile
+    command: sh -c "/usr/local/bin/rq worker $$QUEUE_NAME"
+    env_file:
+      - ../.env.development
+    depends_on:
+      - redis
+
+volumes:
+  cache:
