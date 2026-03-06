@@ -1,12 +1,12 @@
 # Core dependencies
-fastapi==0.115.6
-uvicorn[standard]==0.34.0
-pydantic==2.10.3
-pydantic-settings==2.6.1
+fastapi==0.135.1
+uvicorn[standard]==0.41.0
+pydantic==2.12.5
+pydantic-settings==2.13.1
 
 # Redis and Queue
-redis==5.2.1
-rq==2.0.0
+redis==7.2.1
+rq==2.7.0
 
 # Additional utilities
-python-multipart==0.0.20
+python-multipart==0.0.22
