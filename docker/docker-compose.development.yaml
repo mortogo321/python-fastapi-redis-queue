@@ -29,7 +29,9 @@ services:
     build:
       context: ../
       dockerfile: docker/Dockerfile
-    command: sh -c "/usr/local/bin/rq worker $$QUEUE_NAME"
+    # The RQ CLI does not read REDIS_HOST/REDIS_PASSWORD env vars, so pass an
+    # explicit broker URL (double-$$ survives compose interpolation).
+    command: sh -c "/usr/local/bin/rq worker --url redis://:$$REDIS_PASSWORD@$$REDIS_HOST:6379/0 $$QUEUE_NAME"
     env_file:
       - ../.env.development
     depends_on:

@@ -3,8 +3,7 @@ from typing import Any
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -29,7 +28,9 @@ def print_number(lowest: int, highest: int) -> dict[str, Any]:
     """
     # Input validation
     if not isinstance(lowest, int) or not isinstance(highest, int):
-        error_msg = f"Both arguments must be integers. Got lowest={type(lowest)}, highest={type(highest)}"
+        error_msg = (
+            f"Both arguments must be integers. Got lowest={type(lowest)}, highest={type(highest)}"
+        )
         logger.error(error_msg)
         raise TypeError(error_msg)
 
@@ -60,7 +61,6 @@ def print_number(lowest: int, highest: int) -> dict[str, Any]:
             "message": f"Successfully printed {count} numbers from {lowest} to {highest}",
         }
 
-    except Exception as e:
-        error_msg = f"Job failed with error: {str(e)}"
-        logger.error(error_msg, exc_info=True)
+    except Exception:
+        logger.exception("Job failed with error")
         raise

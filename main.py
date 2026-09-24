@@ -5,7 +5,9 @@ from fastapi import FastAPI, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from redis import Redis
+from redis.exceptions import RedisError
 from rq import Queue
+from rq.exceptions import NoSuchJobError
 from rq.job import Job
 
 from job import print_number
@@ -15,14 +17,15 @@ class Settings(BaseSettings):
     """Application settings with validation."""
 
     model_config = SettingsConfigDict(
-        env_file=".env.development",
-        case_sensitive=False,
-        extra="ignore"
+        env_file=".env.development", case_sensitive=False, extra="ignore"
     )
 
     redis_host: str = "localhost"
     redis_port: int = 6379
-    redis_password: str
+    # Empty by default so `import main` (and tests) work without env files.
+    # Compose supplies a dev-only password via .env.development; set
+    # REDIS_PASSWORD in the environment for anything beyond local dev.
+    redis_password: str = ""
     queue_name: str = "default"
 
 
@@ -43,7 +46,7 @@ async def lifespan(app: FastAPI):
     redis_conn = Redis(
         host=settings.redis_host,
         port=settings.redis_port,
-        password=settings.redis_password,
+        password=settings.redis_password or None,
         decode_responses=False,
         socket_connect_timeout=5,
         socket_keepalive=True,
@@ -53,8 +56,8 @@ async def lifespan(app: FastAPI):
     # Test connection
     try:
         redis_conn.ping()
-    except Exception as e:
-        raise RuntimeError(f"Failed to connect to Redis: {e}")
+    except RedisError as e:
+        raise RuntimeError(f"Failed to connect to Redis: {e}") from e
 
     yield
 
@@ -121,7 +124,7 @@ async def health_check() -> HealthResponse:
         try:
             redis_conn.ping()
             redis_connected = True
-        except Exception:
+        except RedisError:
             pass
 
     return HealthResponse(
@@ -163,13 +166,18 @@ async def create_job(job_data: JobData) -> JobResponse:
         return JobResponse(
             success=True,
             job_id=job_instance.id,
-            status=job_instance.get_status(),
+            status=str(job_instance.get_status()),
             message=f"Job created to print numbers from {job_data.lowest} to {job_data.highest}",
         )
-    except Exception as e:
+    except RedisError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Job queue is not available: {e}",
+        )
+    except Exception as e:  # noqa: BLE001 — last-resort guard mapping to HTTP 500
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create job: {str(e)}",
+            detail=f"Failed to create job: {e!s}",
         )
 
 
@@ -199,15 +207,20 @@ async def get_job_status(job_id: str) -> dict[str, Any]:
         return {
             "success": True,
             "job_id": job.id,
-            "status": job.get_status(),
+            "status": str(job.get_status()),
             "created_at": job.created_at.isoformat() if job.created_at else None,
             "started_at": job.started_at.isoformat() if job.started_at else None,
             "ended_at": job.ended_at.isoformat() if job.ended_at else None,
             "result": job.result,
             "exc_info": job.exc_info if job.is_failed else None,
         }
-    except Exception as e:
+    except NoSuchJobError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Job not found: {str(e)}",
+            detail=f"Job not found: {job_id}",
+        )
+    except RedisError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Job store is not available: {e}",
         )

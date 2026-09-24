@@ -67,4 +67,12 @@ docker/
 └── docker-compose.development.yaml
 ```
 
-Configuration is read from environment variables (`REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `QUEUE_NAME`) — see `.env.development`.
+Configuration is read from environment variables (`REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `QUEUE_NAME`) — see `.env.development`. That file holds a dev-only Redis password for local compose; override `REDIS_PASSWORD` in the environment for anything beyond local development.
+
+## Checks
+
+```bash
+pip install -r requirements-dev.txt
+ruff check . && ruff format --check .
+pytest
+```
